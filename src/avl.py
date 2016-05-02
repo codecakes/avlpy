@@ -109,7 +109,7 @@ class TreeNode(object):
     def min_node_left(self):
         '''Largest/Max node on the left Subtree of the Node is the next smaller node to self node'''
         currentNode = self
-        return findMin(currentNode.leftChild) if currentNode.hasLeftChild() else currentNode
+        return findMax(currentNode.leftChild) if currentNode.hasLeftChild() else currentNode
 
     def next_smaller(self):
         '''Find the node that is next smaller to self node'''
