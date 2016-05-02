@@ -62,37 +62,19 @@ class TreeNode(object):
 
     def removeParent(self, newParent, otherNode=None):
         '''Removes self's old parents and assigs it newParent'''
+        parent_child_dir = 'leftChild' if self.isLeftChild() else ('rightChild' if self.isRightChild() else None)
         # Sets self node's parents point to the otherNode
         self.setParentChild(otherNode)
         # Sets self node' parent to newParent
         self.parent = newParent
+        if parent_child_dir:
+            setattr(newParent, parent_child_dir, self)
 
-    def replaceNodeData(self,key,value,lc=None,rc=None, parent=None):
+    def replaceNodeData(self,key,value):
         self.key = key
         self.val = value
-        if self.hasLeftChild():
-            #detach self as the left child's parent
-            self.leftChild.parent = None
-        #assign new left child
-        self.leftChild = lc
-        #attach self as the left child's parent
-        if self.leftChild: self.leftChild.parent = self
 
-        if self.hasRightChild():
-            #detach self as the right child's parent
-            self.rightChild.parent = None
-        #assign new right child
-        self.rightChild = rc
-        #attach self as the right child's parent
-        if self.rightChild: self.rightChild.parent = self
-
-        self.removeParent(parent)
-
-    def _swap(self, min_node):
-        #technically, swapping is..
-        #self.replaceNodeData(min_node.key, min_node.val, parent=min_node.parent)
-        min_node.replaceNodeData(self.key, self.val, lc = self.leftChild, rc = self.rightChild, parent = self.parent)
-
+    # All about Next Larger Node
     def max_node_right(self):
         '''Find the root node of the subtree to which this node-> self belongs to'''
         currentNode = self
@@ -105,75 +87,96 @@ class TreeNode(object):
         currentNode = self
         return findMin(currentNode.rightChild) if currentNode.hasRightChild() else currentNode
 
-    #TODO: Implement next_larger()
     def next_larger(self):
         '''Find the node with next larger key'''
         currentNode = self
         return currentNode.max_node_right() if not currentNode.hasRightChild() \
         else currentNode.min_node_right()
 
+    # All about Next Smaller Node
+    def max_node_left(self):
+        '''Nearest Left Root of the subtree in which the self is'''
+        currentNode = self
+        while currentNode.isLeftChild() and currentNode.parent:
+            currentNode = currentNode.parent
+        return currentNode.parent
+
+    def min_node_left(self):
+        '''Largest/Max node on the left Subtree of the Node is the next smaller node to self node'''
+        currentNode = self
+        return findMin(currentNode.leftChild) if currentNode.hasLeftChild() else currentNode
+
+    def next_smaller(self):
+        '''Find the node that is next smaller to self node'''
+        currentNode = self
+        return currentNode.max_node_left() if not currentNode.hasLeftChild() \
+        else currentNode.min_node_left()
+
 
 #BST functions
+def swap(node1, node2):
+    tmp = node1
+    node1.replaceNodeData(node2.key, node2.val)
+    node2.replaceNodeData(tmp.key, tmp.val)
+
+def destroy(node):
+    if node.parent:
+        if node.isLeftChild():
+            node.parent.leftChild = None
+        else:
+            node.parent.rightChild = None
+    if node.hasLeftChild():
+        node.leftChild = None
+    if node.hasRightChild():
+        node.rightChild = None
+    del node
+
 def delMax(bst):
     node = findMax(bst.root)
-    parent = node.parent
-    parent.rightChild = None
-    bst.size -= 1
-    return node
+    print "deleting %s"%(node.key)
+    newNode = bst._remove(node)
+    return newNode
 
 def delMin(bst):
     node = findMin(bst.root)
-    parent = node.parent
-    parent.leftChild = None
-    bst.size -= 1
-    return node
+    print "deleting %s"%(node.key)
+    newNode = bst._remove(node)
+    return newNode
 
-def delete(bst, node):
+def delete(self, node):
     """
-    search and perform removal for bst.
-    """
-    return remove(bst, node)
-
-def remove(self, node):
-    """
+    perform removal for bst.
     @param:
         - self: bst Tree
         - node: node to be removed
 
     Assuming key is not Min or Max.
         - If key is a leaf - just delete
-        - If key has one subtree - root of child-subtree takes key'
-     position
-        - If key has two subtrees:
+        - If key has one subtree i.e. left subtree - max leaf of left subtree \
+        takes key' position
+        - If key has two subtrees OR right subtree:
                 - find Min node of right subtree
                 - swap Min node with key.
                 - delete key
     """
-    res = None
-    if node.hasLeftChild() and not node.hasRightChild():
-        x = node.leftChild
-        node.replaceNodeData(x.key,x.val,lc=x.leftChild,rc=x.rightChild, parent=node.parent)
-        if not node.parent: self.root = node
-        del x
-        res = node
-    elif node.hasRightChild() and not node.hasLeftChild():
-        x = node.rightChild
-        node.replaceNodeData(x.key,x.val,lc=x.leftChild,rc=x.rightChild, parent=node.parent)
-        if not node.parent: self.root = node
-        del x
-        res = node
-    elif node.hasLeftChild() and node.hasRightChild():
-        min_node = node.next_larger()
-        node._swap(min_node)
-        if not min_node.parent: self.root = min_node.parent
-        del node
-        res = min_node
-    elif node.isLeaf():
+    parent = node.parent
+    if node.isLeaf():
+        if not parent: self.root = None
         node.setParentChild(None)
-        if not node.parent: self.root = None
         del node
+        return parent
 
-    return res
+    if node.hasLeftChild() and not node.hasRightChild():
+        newNode = node.min_node_left()
+    elif node.hasRightChild():
+        newNode = node.next_larger()
+    swap(node, newNode)
+    destroy(newNode)
+    if not parent: self.root = node
+    else: node.parent = parent
+    del newNode
+    return node
+
 
 
 class BinarySearchTree(object):
@@ -203,12 +206,14 @@ class BinarySearchTree(object):
 
     def __iter__(self):
         '''bfs type level order traversal'''
-        s = deque([self.root], 3)
-        while s:
-            node = s.pop()
-            yield node
-            if node.hasLeftChild(): s.appendleft(node.leftChild)
-            if node.hasRightChild(): s.appendleft(node.rightChild)
+        if self.root:
+            s = deque([self.root], 3)
+            while s:
+                node = s.pop()
+                yield node
+                if node.hasLeftChild(): s.appendleft(node.leftChild)
+                if node.hasRightChild(): s.appendleft(node.rightChild)
+        return
 
     # insert operation
     def insert(self,key,val, nodeClass=TreeNode, left=None, right=None):
@@ -236,12 +241,16 @@ class BinarySearchTree(object):
     def __setitem__(self, key, val):
         return self.insert(key, val)
 
-    # delete operation
-    def __delitem__(self, key):
-        node = self[key]
+    def _remove(self, node):
         if node:
             node = delete(self, node)
             self.size -= 1
+
+    # delete operation
+    def __delitem__(self, key):
+        node = self[key]
+        self._remove(node)
+        # Returns either None if node Key not found or the newly replaced node in its position
         return node
 
 # avlNode functions
@@ -347,6 +356,16 @@ def rebalance(avl, node):
         currentNode = currentNode.parent
         # if currentNode: print "node's parent=%s"%(currentNode.key)
 
+def avlDelMax(avl):
+    newNode = delMax(avl)
+    if newNode:
+        rebalance(avl, newNode)
+
+def avlDelMin(avl):
+    newNode = delMin(avl)
+    if newNode:
+        rebalance(avl, newNode)
+
 
 class avlTree(BinarySearchTree):
 
@@ -388,8 +407,10 @@ if __name__ == "__main__":
         print x.key, x.val
     print "="*10
 
-
+    print "deleting b[1]"
     del b[1]
+    assert b.size == 2
+
     for x in b:
         print x.key, x.val
     print "="*10
@@ -398,6 +419,7 @@ if __name__ == "__main__":
     b.insert(40, 'hotness')
     b.insert(400, 'hotness')
     b.insert(-34540, 'hotness')
+    assert b.size == 6
 
     for x in b:
         print x.key, x.val
@@ -414,6 +436,7 @@ if __name__ == "__main__":
     r[6] = 'six'
     r[5] = 'five'
     assert r.root.key == 4
+    assert r.size == 6
 
     for x in r:
         print x.key, x.val
@@ -426,19 +449,21 @@ if __name__ == "__main__":
     # for each in arr: r[each] = each
 
     print "\n testing for delMax and delMin"
-    del_stat = [0, 1, 0, 1, 1, 1, 1, 0, 0, 1]
+    del_stat = [0, 1, 0, 1, 0, 1]
 
-
-
+    assert r.root != None
     for each in del_stat:
         if each:
-            delMax(r)
+            avlDelMax(r)
+            print "avlDelMax done"
         else:
-            delMin(r)
-
-    for x in r:
-        print x.key, x.val
-    print "="*10
+            avlDelMin(r)
+            print "avlDelMin done"
+        print "="*5, "listing nodes","="*5
+        for x in r:
+            print x.key, x.val
+        "="*10
+    assert r.root == None
 
 
 
