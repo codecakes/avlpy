@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 
+"""
+For rotations checkout this helpful link:
+https://triangleinequality.wordpress.com/2014/07/15/how-to-balance-your-binary-search-trees-avl-trees/
+"""
+
 from collections import deque
 
 # Individual Node operations
